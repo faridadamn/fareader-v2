@@ -16,14 +16,13 @@ Aplikasi memakai Node.js dan PostgreSQL read-only:
 
 Secara default, production hanya menampilkan `books.status = published`. Set `PREVIEW_CATALOG=1` hanya pada environment review untuk turut melihat `ready_for_review`.
 
-## Deploy Render
+## Deploy Vercel
 
-1. Buat Web Service baru di Render dan hubungkan repo ini.
-2. Pilih blueprint `render.yaml` atau gunakan perintah build `npm install` dan start `npm start`.
-3. Tambahkan environment variable `DATABASE_URL` dari project Supabase Lexis. Jangan pernah commit nilai ini ke GitHub.
-4. Biarkan `PREVIEW_CATALOG=0` untuk production.
-5. Setelah health check `/api/health` hijau, uji halaman utama, pencarian, halaman buku, dan Knowledge.
-6. Arahkan subdomain baru seperti `v2.fareader.io` setelah pengujian selesai. Jangan mengganti domain V1 sebelum V2 lolos uji.
+1. Hubungkan repo ini ke Vercel.
+2. Tambahkan environment variable `DATABASE_URL` dari project Supabase Lexis. Jangan pernah commit nilainya ke GitHub.
+3. Biarkan `PREVIEW_CATALOG=0` untuk production.
+4. Uji `/api/health`, halaman utama, pencarian, reader, dan Knowledge setelah deploy.
+5. Jangan mengganti `fareader.io` V1 sebelum V2 lolos uji production.
 
 ## Local
 
@@ -31,3 +30,13 @@ Secara default, production hanya menampilkan `books.status = published`. Set `PR
 npm install
 DATABASE_URL='postgresql://...' npm start
 ```
+
+## Automated Production Iteration Log
+
+Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V2 production. Setiap laporan menuliskan: tujuan iterasi, pengujian, perubahan yang dibuat, hasil, risiko, dan langkah berikutnya.
+
+<!-- ITERATION_REPORTS_START -->
+
+Belum ada iterasi yang dicatat.
+
+<!-- ITERATION_REPORTS_END -->
