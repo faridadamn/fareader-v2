@@ -227,4 +227,31 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 8 fokus ke relasi buku dan insight: cek apakah data memungkinkan discovery buku–tema–insight secara read-only, atau dokumentasikan blocker data dengan jelas.
 - Commit: `8d1d51642cb58471ec74cf11e7535a3c636ca4e6`
 
+### Iterasi 8 — Relasi Buku dan Insight Read-Only
+
+- Waktu: 2026-07-02 17:58 WIB
+- Tujuan: Membuat hubungan ringan buku–insight sebagai discovery read-only berdasarkan kategori yang sudah tersedia, tanpa schema baru dan tanpa mengubah konten sumber.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga halaman live belum bisa diklaim terverifikasi dari tool.
+  - Mencoba membuka `/api/health`, `/api/dashboard`, `/api/books?limit=3`, `/api/categories`, dan `/api/topics?limit=3`; web tool menolak URL turunan karena pembatasan safe-open terhadap URL yang tidak persis dari pesan pengguna.
+  - Inspect kode frontend menunjukkan `state.books` dan `state.topics` sudah dimuat saat `init()`, dan keduanya membawa `categories`, sehingga relasi read-only dapat dibuat di browser tanpa endpoint baru.
+  - Inspect kode backend menunjukkan production default tetap memakai `published`; iterasi ini tidak menyentuh filter `allowedStatuses()` maupun query buku.
+- Perubahan:
+  - Menambahkan helper frontend `categoryKey()`, `sharedCategories()`, `relatedTopicsForBook()`, dan `relatedBooksForTopic()`.
+  - Halaman reader buku sekarang dapat menampilkan section `Insight terkait` berdasarkan kategori buku dan kategori Lexis Knowledge yang sama.
+  - Halaman detail Knowledge sekarang dapat menampilkan section `Buku terkait` berdasarkan kategori topic dan kategori buku yang sama.
+  - Discovery memakai data yang sudah ada di `state.books` dan `state.topics`; tidak ada schema baru, endpoint baru, query database baru, atau perubahan isi editorial.
+  - Perubahan juga memasukkan hotfix sebelumnya untuk `/api/topics` agar agregasi notes tidak bergantung pada `notes.created_at` jika kolom itu tidak tersedia.
+- Hasil:
+  - Relasi buku–tema–insight kini tersedia sebagai discovery ringan dan aman, selama kategori buku dan topic punya irisan nama yang sama.
+  - Perubahan sudah dicommit ke `main`.
+  - Tidak ada perubahan pada V1, DNS, domain, Supabase schema, data, secret, atau filter publik `published`.
+- Risiko/temuan:
+  - Relasi masih bersifat heuristik berdasarkan kesamaan kategori, bukan relasi editorial eksplisit.
+  - Karena daftar awal topics dibatasi `limit=60`, insight terkait hanya memakai topic yang sudah dimuat frontend. Relasi penuh membutuhkan endpoint discovery khusus atau tabel relasi, tetapi itu sengaja tidak dibuat pada iterasi ini.
+  - Perlu verifikasi visual dari browser lokal setelah Vercel selesai redeploy.
+- Langkah berikutnya:
+  - Iterasi 9 fokus pada auth readiness: audit kebutuhan skema dan UX login/sinkronisasi tanpa mengaktifkan auth atau menjalankan migrasi schema.
+- Commit: `9b26a436bc8270e5699b168503826edfbda5f0d1`, `1d3e8a8eb7fb367d4356886ca35bfca8b9161b2e`
+
 <!-- ITERATION_REPORTS_END -->
