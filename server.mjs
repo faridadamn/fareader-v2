@@ -153,7 +153,7 @@ async function listTopics(url) {
       t.categories,
       t.points,
       t.created_at,
-      coalesce(string_agg(n.content, E'\n\n' order by n.created_at desc nulls last), '') as note_content
+      coalesce(string_agg(n.content::text, E'\n\n'), '') as note_content
     from public.topics t
     left join public.notes n on n.topic_id = t.id
     where ${q} = ''
@@ -184,7 +184,7 @@ async function topicDetail(id) {
       t.categories,
       t.points,
       t.created_at,
-      coalesce(string_agg(n.content, E'\n\n' order by n.created_at desc nulls last), '') as note_content
+      coalesce(string_agg(n.content::text, E'\n\n'), '') as note_content
     from public.topics t
     left join public.notes n on n.topic_id = t.id
     where t.id = ${id}
