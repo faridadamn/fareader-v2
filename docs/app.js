@@ -20,6 +20,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
 }[char]));
 const initials = title => String(title || 'FA').split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase();
 const isReadableBook = book => Number(book.section_count || 0) > 0;
+const categoryKey = value => String(value || '').trim().toLowerCase();
 
 async function api(path) {
   const res = await fetch(path);
@@ -134,6 +135,43 @@ function tags(values = []) {
   return values.length ? values.map(value => `<span class="tag">${esc(value)}</span>`).join('') : '<span class="tag">Tanpa kategori</span>';
 }
 
+function sharedCategories(left = [], right = []) {
+  const keys = new Set(left.map(categoryKey).filter(Boolean));
+  return right.filter(value => keys.has(categoryKey(value)));
+}
+
+function relatedTopicsForBook(book) {
+  if (!book?.categories?.length) return [];
+  return state.topics
+    .map(topic => ({ ...topic, shared: sharedCategories(book.categories, topic.categories || []) }))
+    .filter(topic => topic.shared.length > 0)
+    .slice(0, 4);
+}
+
+function relatedBooksForTopic(topic) {
+  if (!topic?.categories?.length) return [];
+  return state.books
+    .map(book => ({ ...book, shared: sharedCategories(topic.categories, book.categories || []) }))
+    .filter(book => book.shared.length > 0)
+    .slice(0, 4);
+}
+
+function discoveryItem(item, type) {
+  const description = type === 'topic'
+    ? ((item.points || [])[0] || item.note_content || 'Insight tersimpan di Lexis Library.')
+    : (item.description || 'Ringkasan buku tersedia di FA Reader.');
+  const action = type === 'topic'
+    ? `<button class="primary-button" onclick="openTopic('${encodeURIComponent(item.id)}')">Buka insight</button>`
+    : `<button class="primary-button" onclick="openBook('${encodeURIComponent(item.slug)}', ${progressFor(item)?.sectionIndex || 0})">Buka buku</button>`;
+  const shared = item.shared?.length ? `<p class="reader-meta">Terhubung lewat ${esc(item.shared.join(', '))}</p>` : '';
+  return `<article class="book-card"><div class="cover">${initials(item.title)}</div><div><p class="eyebrow">${type === 'topic' ? 'INSIGHT TERKAIT' : 'BUKU TERKAIT'}</p><h3>${esc(item.title)}</h3><p>${esc(description)}</p>${shared}${tags(item.categories)}<div class="card-actions">${action}</div></div></article>`;
+}
+
+function discoverySection(title, subtitle, items, type) {
+  if (!items.length) return '';
+  return `<section class="reader-section"><p class="eyebrow">Discovery</p><h2>${esc(title)}</h2><p class="reader-meta">${esc(subtitle)}</p><div class="book-grid">${items.map(item => discoveryItem(item, type)).join('')}</div></section>`;
+}
+
 function bookMeta(book) {
   const parts = [];
   if (book.reading_time_minutes) parts.push(`${book.reading_time_minutes} menit baca`);
@@ -232,11 +270,12 @@ async function openBook(encoded, initialSection = 0) {
     const book = await api(`/api/books/${encoded}`);
     const sections = book.sections || [];
     const safeInitialSection = Math.min(Math.max(Number(initialSection || 0), 0), Math.max(sections.length - 1, 0));
+    const relatedTopics = relatedTopicsForBook(book);
     state.currentBookSlug = book.slug;
     state.currentSectionsTotal = sections.length;
     setView('reader');
     const nav = sections.map((section, index) => `<button class="${index === safeInitialSection ? 'active' : ''}" data-section-index="${index}" onclick="scrollToReaderSection(${index})">${esc(sectionNavLabel(section, index))}</button>`).join('');
-    $('#reader').innerHTML = `<div class="reader-shell"><div class="reader-top"><div><p class="eyebrow">${esc(book.summary_publisher || 'FA Reader')}</p><h1 class="reader-title">${esc(book.title)}</h1><p class="reader-meta">${esc(book.original_author || '')} · ${book.reading_time_minutes || 0} menit baca · ${sections.length} section${sections.length ? ` · Terakhir dibuka section ${safeInitialSection + 1}` : ''}</p>${tags(book.categories)}</div><button class="ghost-button" onclick="bookmark('${encoded}')">${state.bookmarks.has(book.slug) ? '★ Tersimpan' : '☆ Simpan'}</button></div>${sections.length ? `<div class="reader-nav" aria-label="Navigasi section">${nav}</div>` : ''}${sections.length ? sections.map((section, index) => sectionArticle(section, index, sections.length)).join('') : '<div class="reader-empty"><h2>Rangkuman belum memiliki section</h2></div>'}</div>`;
+    $('#reader').innerHTML = `<div class="reader-shell"><div class="reader-top"><div><p class="eyebrow">${esc(book.summary_publisher || 'FA Reader')}</p><h1 class="reader-title">${esc(book.title)}</h1><p class="reader-meta">${esc(book.original_author || '')} · ${book.reading_time_minutes || 0} menit baca · ${sections.length} section${sections.length ? ` · Terakhir dibuka section ${safeInitialSection + 1}` : ''}</p>${tags(book.categories)}</div><button class="ghost-button" onclick="bookmark('${encoded}')">${state.bookmarks.has(book.slug) ? '★ Tersimpan' : '☆ Simpan'}</button></div>${sections.length ? `<div class="reader-nav" aria-label="Navigasi section">${nav}</div>` : ''}${sections.length ? sections.map((section, index) => sectionArticle(section, index, sections.length)).join('') : '<div class="reader-empty"><h2>Rangkuman belum memiliki section</h2></div>'}${discoverySection('Insight terkait', 'Rekomendasi read-only berdasarkan kategori buku dan kategori Lexis Knowledge yang sama.', relatedTopics, 'topic')}</div>`;
     if (sections.length) {
       markProgress(book.slug, safeInitialSection, sections.length);
       if (safeInitialSection > 0) setTimeout(() => scrollToReaderSection(safeInitialSection), 80);
@@ -249,11 +288,12 @@ async function openBook(encoded, initialSection = 0) {
 async function openTopic(encoded) {
   try {
     const topic = await api(`/api/topics/${encoded}`);
+    const relatedBooks = relatedBooksForTopic(topic);
     state.currentBookSlug = null;
     state.currentSectionsTotal = 0;
     setView('reader');
     const points = (topic.points || []).map(point => `- ${point}`).join('\n');
-    $('#reader').innerHTML = `<div class="reader-shell"><p class="eyebrow">LEXIS KNOWLEDGE</p><h1 class="reader-title">${esc(topic.title)}</h1><p class="reader-meta">${tags(topic.categories)}</p><article class="reader-section"><h2>Poin penting</h2><div class="reader-prose">${renderRichText(points)}</div></article>${topic.note_content ? `<article class="reader-section"><h2>Catatan</h2><div class="reader-prose">${renderRichText(topic.note_content)}</div></article>` : ''}</div>`;
+    $('#reader').innerHTML = `<div class="reader-shell"><p class="eyebrow">LEXIS KNOWLEDGE</p><h1 class="reader-title">${esc(topic.title)}</h1><p class="reader-meta">${tags(topic.categories)}</p><article class="reader-section"><h2>Poin penting</h2><div class="reader-prose">${renderRichText(points)}</div></article>${topic.note_content ? `<article class="reader-section"><h2>Catatan</h2><div class="reader-prose">${renderRichText(topic.note_content)}</div></article>` : ''}${discoverySection('Buku terkait', 'Rekomendasi read-only berdasarkan kategori Lexis Knowledge dan kategori buku yang sama.', relatedBooks, 'book')}</div>`;
   } catch (error) {
     showReaderError(error.message);
   }
