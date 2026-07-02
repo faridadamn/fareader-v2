@@ -168,7 +168,7 @@ async function topicDetail(id) {
   return { ...row, categories: normalizeJsonArray(row.categories), points: normalizeJsonArray(row.points) };
 }
 
-const server = createServer(async (request, response) => {
+export default async function handler(request, response) {
   try {
     const url = new URL(request.url, `http://${request.headers.host}`);
     const pathname = url.pathname;
@@ -193,6 +193,9 @@ const server = createServer(async (request, response) => {
     console.error(error);
     sendJson(response, 500, { error: "Internal server error" });
   }
-});
+}
 
-server.listen(port, host, () => console.log(`FA Reader V2 running on http://${host}:${port}`));
+if (!process.env.VERCEL) {
+  const server = createServer(handler);
+  server.listen(port, host, () => console.log(`FA Reader V2 running on http://${host}:${port}`));
+}
