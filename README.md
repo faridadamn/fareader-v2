@@ -254,4 +254,30 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 9 fokus pada auth readiness: audit kebutuhan skema dan UX login/sinkronisasi tanpa mengaktifkan auth atau menjalankan migrasi schema.
 - Commit: `9b26a436bc8270e5699b168503826edfbda5f0d1`, `1d3e8a8eb7fb367d4356886ca35bfca8b9161b2e`
 
+### Iterasi 9 — Auth Readiness Tanpa Aktivasi Login
+
+- Waktu: 2026-07-02 19:01 WIB
+- Tujuan: Mengaudit kesiapan login/sinkronisasi akun tanpa mengaktifkan auth, tanpa migrasi schema, dan tanpa mengubah permission database.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga halaman live belum bisa diverifikasi dari tool ini.
+  - Mencoba membuka `/api/health`, `/api/dashboard`, `/api/books?limit=3`, dan `/api/topics?limit=3`; web tool menolak URL turunan karena pembatasan safe-open terhadap URL yang tidak persis dari pesan pengguna.
+  - Inspect `package.json` menunjukkan dependency production hanya `postgres`; belum ada dependency auth client/server.
+  - Inspect `server.mjs` menunjukkan endpoint masih read-only (`GET`) dan tidak ada endpoint user write, session, cookie auth, atau token handling.
+  - Inspect `docs/app.js` menunjukkan bookmark dan progress masih local-first memakai `localStorage`, sehingga fitur personal saat ini tidak membutuhkan schema user.
+- Perubahan:
+  - Menambahkan `docs/AUTH_READINESS.md` sebagai proposal auth readiness yang aman.
+  - Dokumen tersebut mencatat status local-first, kandidat fitur auth, rancangan tabel yang mungkin dibutuhkan, prinsip keamanan, UX placeholder yang aman, strategi migrasi localStorage ke sync, dan blocker sebelum implementasi.
+  - Tidak menambahkan dependency auth, form login, endpoint write, cookie/session, migrasi schema, RLS policy, atau perubahan Supabase.
+  - Tidak mengubah filter katalog publik; production tetap hanya boleh menampilkan buku `published` kecuali environment review eksplisit memakai `PREVIEW_CATALOG=1`.
+- Hasil:
+  - Kesiapan auth sekarang terdokumentasi sebagai proposal, bukan implementasi setengah jadi.
+  - Tidak ada perubahan runtime yang dapat mengganggu production catalog atau data user lokal.
+- Risiko/temuan:
+  - Provider auth belum dipilih; Supabase Auth adalah opsi natural karena data sudah di Supabase, tetapi belum diputuskan.
+  - Sinkronisasi bookmark/progress butuh tabel user-specific dan policy/RLS yang belum boleh dibuat tanpa persetujuan eksplisit.
+  - UX merge data lokal ke akun perlu dirancang sebelum auth dinyalakan agar bookmark/progress lokal tidak hilang.
+- Langkah berikutnya:
+  - Iterasi 10 fokus security hardening: validasi input endpoint, header keamanan, error exposure, dan data leakage tanpa mengubah secret atau permission database.
+- Commit: `4963c1d35826d8c8729939fc4192033f31c7e826`
+
 <!-- ITERATION_REPORTS_END -->
