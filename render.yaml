@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: fareader-v2
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PREVIEW_CATALOG
+        value: "0"
