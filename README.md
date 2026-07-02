@@ -280,4 +280,30 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 10 fokus security hardening: validasi input endpoint, header keamanan, error exposure, dan data leakage tanpa mengubah secret atau permission database.
 - Commit: `4963c1d35826d8c8729939fc4192033f31c7e826`
 
+### Iterasi 10 — Security Hardening Endpoint Read-Only
+
+- Waktu: 2026-07-02 20:00 WIB
+- Tujuan: Memperkeras endpoint dan response production secara rendah risiko: validasi input, header keamanan, error exposure, dan pencegahan akses file tersembunyi tanpa mengubah secret, permission database, schema, domain, atau filter publik.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga halaman live belum bisa diklaim terverifikasi dari tool ini.
+  - Mencoba membuka `/api/health`, `/api/dashboard`, `/api/books?limit=3`, `/api/categories`, dan `/api/topics?limit=3`; web tool menolak URL turunan karena pembatasan safe-open terhadap URL yang tidak persis dari pesan pengguna.
+  - Inspect `server.mjs` menunjukkan endpoint hanya menerima `GET`, SQL memakai parameter binding dari library `postgres`, dan catch utama hanya mengembalikan pesan generik `Internal server error` untuk error 500.
+  - Inspect juga menemukan beberapa input query/path belum divalidasi eksplisit: `q`, `category`, `limit`, slug buku, dan id topic.
+- Perubahan:
+  - Menambahkan security headers non-breaking untuk JSON, text, dan static response: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, dan `Permissions-Policy`.
+  - Menambahkan validasi `q`/`category` maksimum 120 karakter dan `limit` harus angka positif sebelum diclamping ke batas endpoint.
+  - Menambahkan validasi path segment untuk slug buku dan id topic agar tidak menerima path kosong, slash tambahan, karakter kontrol, atau input terlalu panjang.
+  - Menambahkan blokir akses static ke path dotfile/dot-directory dan mempertahankan proteksi path traversal dengan `path.resolve`.
+  - Error 4xx validasi sekarang dikembalikan sebagai JSON terkontrol; error 5xx tetap generik dan tidak mengekspos detail internal.
+  - Tidak menambahkan auth, tidak mengubah dependency, tidak mengubah secret/env, tidak mengubah Supabase schema/permission, dan tidak mengubah filter katalog publik `published`.
+- Hasil:
+  - Hardening read-only sudah dicommit ke `main`.
+  - Permukaan API lebih ketat tanpa mengubah kontrak data normal untuk katalog, reader, categories, dashboard, dan Knowledge.
+- Risiko/temuan:
+  - CSP belum ditambahkan karena frontend masih memakai beberapa event handler inline; penerapan CSP ketat perlu refactor frontend agar tidak memblokir interaksi.
+  - Verifikasi live dari tool masih terbatas; perlu tes browser/API setelah Vercel redeploy commit terbaru.
+- Langkah berikutnya:
+  - Iterasi 11 fokus performance dan mobile/PWA readiness: loading, asset, caching, responsive UI, dan offline/error fallback dengan perubahan rendah risiko.
+- Commit: `20cfdd12d91ece885dbd28de75b450aeeb2f5758`
+
 <!-- ITERATION_REPORTS_END -->
