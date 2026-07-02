@@ -200,4 +200,31 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 7 fokus ke Lexis Knowledge: uji topics/notes nyata, perbaiki daftar/detail/pencarian dan empty state tanpa mengubah konten sumber.
 - Commit: `21a8d9f3c451dc511cafc079f18fdafd3414d0d9`
 
+### Iterasi 7 — Lexis Knowledge Search dan Notes
+
+- Waktu: 2026-07-02 16:58 WIB
+- Tujuan: Memperbaiki dasar Knowledge agar pencarian topics/notes lebih andal tanpa mengubah isi Lexis, database, schema, atau status buku.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga kondisi live Vercel belum bisa diklaim terverifikasi dari tool.
+  - Mencoba membuka endpoint turunan `/api/health`, `/api/books`, dan `/api/topics`; web tool menolak URL turunan karena pembatasan safe-open terhadap URL yang tidak persis dari pesan pengguna.
+  - Inspect `server.mjs` menunjukkan `/api/topics?q=` sebelumnya mengambil daftar topic terbaru dengan `limit`, lalu baru memfilter hasil di JavaScript. Ini berisiko membuat pencarian Knowledge tidak menemukan topic lama yang cocok.
+  - Inspect `server.mjs` juga menunjukkan join `topics` ke `notes` belum menggabungkan beberapa note per topic, sehingga topic berpotensi duplikat di list atau detail hanya mengambil satu baris note.
+  - Inspect `docs/app.js` mengonfirmasi UI Knowledge sudah memakai data dari `/api/topics?limit=60`, kartu topic, detail topic, dan renderer `renderRichText()` untuk points/note.
+- Perubahan:
+  - Query `/api/topics` sekarang menerapkan filter `q` di SQL sebelum `limit`, sehingga pencarian topic, kategori, points, dan notes tidak terbatas pada batch terbaru saja.
+  - Notes per topic sekarang digabung dengan `string_agg(...)` pada list dan detail topic, bukan mengambil satu baris join arbitrer.
+  - `topicDetail()` sekarang memakai agregasi note dan `group by t.id` agar detail topic tetap satu record per topic.
+  - Tidak ada perubahan pada isi topics/notes, Supabase schema, database permission, domain, DNS, endpoint buku, atau filter publik `published`.
+- Hasil:
+  - Backend Knowledge lebih siap untuk pencarian dan pembacaan note nyata dari Lexis Library.
+  - Perubahan sudah dicommit ke `main`.
+  - Verifikasi data live masih menunggu akses Vercel/API yang berhasil dari browser lokal atau run berikutnya.
+- Risiko/temuan:
+  - Jika kolom `notes.created_at` tidak tersedia di schema Supabase, urutan agregasi note perlu disesuaikan ke kolom lain atau tanpa explicit order.
+  - UI Knowledge belum punya search box khusus; saat ini pencarian Knowledge bergantung pada endpoint dan daftar awal yang dimuat frontend.
+  - Karena live endpoint belum bisa diakses dari tool, hasil query terhadap data nyata belum dapat diklaim hijau.
+- Langkah berikutnya:
+  - Iterasi 8 fokus ke relasi buku dan insight: cek apakah data memungkinkan discovery buku–tema–insight secara read-only, atau dokumentasikan blocker data dengan jelas.
+- Commit: `8d1d51642cb58471ec74cf11e7535a3c636ca4e6`
+
 <!-- ITERATION_REPORTS_END -->
