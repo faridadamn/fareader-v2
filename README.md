@@ -113,4 +113,31 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 4 fokus ke pengalaman Perpustakaan: pencarian, filter, empty/loading/error state, dan konsistensi kartu buku.
 - Commit: `9681fd6187a9fca5647e1db6489c031f6aab5fb0`, `76d1e5bfe541dec126d34386b556e14aa27d86bc`
 
+### Iterasi 4 — Pengalaman Perpustakaan
+
+- Waktu: 2026-07-02 13:01 WIB
+- Tujuan: Memperbaiki pengalaman halaman Perpustakaan agar pencarian, filter, sort, loading, empty state, dan kartu buku lebih jelas dipakai.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga kondisi live belum bisa diklaim terverifikasi dari tool.
+  - Inspect `docs/index.html` menunjukkan kategori sudah tersedia, tetapi belum ada kontrol sort atau reset filter.
+  - Inspect `docs/app.js` menunjukkan pencarian sudah mencakup judul, author, deskripsi, dan kategori, namun hasil belum bisa diurutkan oleh pengguna.
+  - Inspect empty state sebelumnya hanya menyarankan kata kunci/kategori lain, belum menyediakan aksi reset langsung.
+- Perubahan:
+  - Menambahkan dropdown sort Perpustakaan: `Terbaru`, `A–Z`, `Paling singkat`, dan `Paling panjang`.
+  - Menambahkan tombol `Reset` untuk mengosongkan pencarian, kategori, dan sort.
+  - Menambahkan loading state awal pada `bookList` dan metadata katalog saat data production sedang dimuat.
+  - Empty state hasil pencarian sekarang menyertakan tombol `Reset filter`.
+  - Hero stat ketiga diubah dari teks statis `Sedang dibaca` menjadi hitungan `Siap dibaca` berdasarkan jumlah buku yang punya section.
+  - Menambahkan styling `.library-controls` agar filter/sort/reset rapi di desktop dan mobile.
+  - Tidak ada perubahan pada endpoint backend, database, status buku, atau filter publik `published`.
+- Hasil:
+  - Katalog sekarang lebih operasional untuk browse: pengguna bisa mencari, memilih kategori, mengurutkan, lalu reset tanpa reload halaman.
+  - Perubahan sudah dicommit ke `main`.
+- Risiko/temuan:
+  - Sort `Terbaru` memakai urutan asli dari API karena backend sudah mengurutkan `published_at/created_at desc`; tidak ada timestamp tambahan diekspos ke frontend.
+  - Verifikasi visual live masih perlu dilakukan dari browser lokal atau setelah akses web tool ke Vercel berhasil.
+- Langkah berikutnya:
+  - Iterasi 5 fokus ke Reader premium: typography, whitespace, paragraph/bullet rendering, section navigation, dan mobile readability.
+- Commit: `a1d42418c247580470737465c5b375b34eb2df53`, `08fb631d87434284522c8b310b5b79f380174cd3`, `256460747cc543abdeca38fd6ed923afaf42386d`
+
 <!-- ITERATION_REPORTS_END -->
