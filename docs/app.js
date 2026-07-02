@@ -3,7 +3,10 @@ const state = {
   books: [],
   topics: [],
   categories: [],
-  bookmarks: new Set(JSON.parse(localStorage.getItem('fareader-v2:bookmarks') || '[]'))
+  currentBookSlug: null,
+  currentSectionsTotal: 0,
+  bookmarks: new Set(JSON.parse(localStorage.getItem('fareader-v2:bookmarks') || '[]')),
+  progress: JSON.parse(localStorage.getItem('fareader-v2:progress') || '{}')
 };
 
 const $ = selector => document.querySelector(selector);
@@ -80,6 +83,44 @@ function saveBookmarks() {
   $('#savedCount').textContent = state.bookmarks.size;
 }
 
+function cleanProgress() {
+  const validSlugs = new Set(state.books.map(book => book.slug));
+  Object.keys(state.progress).forEach(slug => {
+    if (!validSlugs.has(slug)) delete state.progress[slug];
+  });
+}
+
+function saveProgress() {
+  cleanProgress();
+  localStorage.setItem('fareader-v2:progress', JSON.stringify(state.progress));
+}
+
+function progressFor(book) {
+  const saved = state.progress[book.slug];
+  if (!saved || !isReadableBook(book)) return null;
+  const total = Number(book.section_count || saved.total || 0);
+  const index = Math.min(Math.max(Number(saved.sectionIndex || 0), 0), Math.max(total - 1, 0));
+  return { ...saved, sectionIndex: index, total };
+}
+
+function progressText(book) {
+  const progress = progressFor(book);
+  if (!progress) return '';
+  return ` · Lanjut section ${progress.sectionIndex + 1}/${progress.total}`;
+}
+
+function markProgress(slug, sectionIndex, total) {
+  if (!slug || !total) return;
+  state.progress[slug] = {
+    sectionIndex: Math.min(Math.max(Number(sectionIndex || 0), 0), Math.max(Number(total) - 1, 0)),
+    total: Number(total),
+    updatedAt: new Date().toISOString()
+  };
+  saveProgress();
+  renderBooks();
+  renderBookmarks();
+}
+
 function setView(view) {
   state.active = view;
   $$('.view').forEach(element => element.classList.remove('active-view'));
@@ -97,14 +138,17 @@ function bookMeta(book) {
   const parts = [];
   if (book.reading_time_minutes) parts.push(`${book.reading_time_minutes} menit baca`);
   if (book.word_count) parts.push(`${Number(book.word_count).toLocaleString('id-ID')} kata`);
-  parts.push(isReadableBook(book) ? `${book.section_count} section` : 'Belum ada section');
+  parts.push(isReadableBook(book) ? `${book.section_count} section${progressText(book)}` : 'Belum ada section');
   return `<p class="reader-meta">${esc(parts.join(' · '))}</p>`;
 }
 
 function bookCard(book) {
   const saved = state.bookmarks.has(book.slug);
   const readable = isReadableBook(book);
-  return `<article class="book-card ${readable ? '' : 'is-incomplete'}"><div class="cover">${initials(book.title)}</div><div><p class="eyebrow">${esc(book.original_author || 'FA Reader')}</p><h3>${esc(book.title)}</h3><p>${esc(book.description || 'Deskripsi buku belum tersedia.')}</p>${bookMeta(book)}${tags(book.categories)}<div class="card-actions">${readable ? `<button class="primary-button" onclick="openBook('${encodeURIComponent(book.slug)}')">Baca ringkasan</button>` : '<button class="primary-button" disabled>Belum siap dibaca</button>'}<button class="ghost-button" onclick="bookmark('${encodeURIComponent(book.slug)}')">${saved ? 'Tersimpan' : 'Simpan'}</button></div></div></article>`;
+  const progress = progressFor(book);
+  const startIndex = progress ? progress.sectionIndex : 0;
+  const primaryLabel = progress ? 'Lanjut membaca' : 'Baca ringkasan';
+  return `<article class="book-card ${readable ? '' : 'is-incomplete'}"><div class="cover">${initials(book.title)}</div><div><p class="eyebrow">${esc(book.original_author || 'FA Reader')}</p><h3>${esc(book.title)}</h3><p>${esc(book.description || 'Deskripsi buku belum tersedia.')}</p>${bookMeta(book)}${tags(book.categories)}<div class="card-actions">${readable ? `<button class="primary-button" onclick="openBook('${encodeURIComponent(book.slug)}', ${startIndex})">${primaryLabel}</button>` : '<button class="primary-button" disabled>Belum siap dibaca</button>'}<button class="ghost-button" onclick="bookmark('${encodeURIComponent(book.slug)}')">${saved ? 'Tersimpan' : 'Simpan'}</button></div></div></article>`;
 }
 
 function topicCard(topic) {
@@ -169,6 +213,7 @@ function scrollToReaderSection(index) {
   if (!target) return;
   target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   $$('.reader-nav button').forEach(button => button.classList.toggle('active', Number(button.dataset.sectionIndex) === index));
+  markProgress(state.currentBookSlug, index, state.currentSectionsTotal);
 }
 
 function sectionNavLabel(section, index) {
@@ -182,13 +227,20 @@ function sectionArticle(section, index, total) {
   return `<article id="section-${index}" class="reader-section"><p class="eyebrow">${esc(section.heading_label || (index === 0 ? 'PENGANTAR' : `BAGIAN ${index}`))}</p><h2>${esc(section.title || sectionNavLabel(section, index))}</h2><div class="reader-prose">${renderRichText(section.content)}</div><div class="reader-section-footer"><span>${index + 1} dari ${total} section</span><div>${previousButton}${nextButton}</div></div></article>`;
 }
 
-async function openBook(encoded) {
+async function openBook(encoded, initialSection = 0) {
   try {
     const book = await api(`/api/books/${encoded}`);
     const sections = book.sections || [];
+    const safeInitialSection = Math.min(Math.max(Number(initialSection || 0), 0), Math.max(sections.length - 1, 0));
+    state.currentBookSlug = book.slug;
+    state.currentSectionsTotal = sections.length;
     setView('reader');
-    const nav = sections.map((section, index) => `<button class="${index === 0 ? 'active' : ''}" data-section-index="${index}" onclick="scrollToReaderSection(${index})">${esc(sectionNavLabel(section, index))}</button>`).join('');
-    $('#reader').innerHTML = `<div class="reader-shell"><div class="reader-top"><div><p class="eyebrow">${esc(book.summary_publisher || 'FA Reader')}</p><h1 class="reader-title">${esc(book.title)}</h1><p class="reader-meta">${esc(book.original_author || '')} · ${book.reading_time_minutes || 0} menit baca · ${sections.length} section</p>${tags(book.categories)}</div><button class="ghost-button" onclick="bookmark('${encoded}')">${state.bookmarks.has(book.slug) ? '★ Tersimpan' : '☆ Simpan'}</button></div>${sections.length ? `<div class="reader-nav" aria-label="Navigasi section">${nav}</div>` : ''}${sections.length ? sections.map((section, index) => sectionArticle(section, index, sections.length)).join('') : '<div class="reader-empty"><h2>Rangkuman belum memiliki section</h2></div>'}</div>`;
+    const nav = sections.map((section, index) => `<button class="${index === safeInitialSection ? 'active' : ''}" data-section-index="${index}" onclick="scrollToReaderSection(${index})">${esc(sectionNavLabel(section, index))}</button>`).join('');
+    $('#reader').innerHTML = `<div class="reader-shell"><div class="reader-top"><div><p class="eyebrow">${esc(book.summary_publisher || 'FA Reader')}</p><h1 class="reader-title">${esc(book.title)}</h1><p class="reader-meta">${esc(book.original_author || '')} · ${book.reading_time_minutes || 0} menit baca · ${sections.length} section${sections.length ? ` · Terakhir dibuka section ${safeInitialSection + 1}` : ''}</p>${tags(book.categories)}</div><button class="ghost-button" onclick="bookmark('${encoded}')">${state.bookmarks.has(book.slug) ? '★ Tersimpan' : '☆ Simpan'}</button></div>${sections.length ? `<div class="reader-nav" aria-label="Navigasi section">${nav}</div>` : ''}${sections.length ? sections.map((section, index) => sectionArticle(section, index, sections.length)).join('') : '<div class="reader-empty"><h2>Rangkuman belum memiliki section</h2></div>'}</div>`;
+    if (sections.length) {
+      markProgress(book.slug, safeInitialSection, sections.length);
+      if (safeInitialSection > 0) setTimeout(() => scrollToReaderSection(safeInitialSection), 80);
+    }
   } catch (error) {
     showReaderError(error.message);
   }
@@ -197,6 +249,8 @@ async function openBook(encoded) {
 async function openTopic(encoded) {
   try {
     const topic = await api(`/api/topics/${encoded}`);
+    state.currentBookSlug = null;
+    state.currentSectionsTotal = 0;
     setView('reader');
     const points = (topic.points || []).map(point => `- ${point}`).join('\n');
     $('#reader').innerHTML = `<div class="reader-shell"><p class="eyebrow">LEXIS KNOWLEDGE</p><h1 class="reader-title">${esc(topic.title)}</h1><p class="reader-meta">${tags(topic.categories)}</p><article class="reader-section"><h2>Poin penting</h2><div class="reader-prose">${renderRichText(points)}</div></article>${topic.note_content ? `<article class="reader-section"><h2>Catatan</h2><div class="reader-prose">${renderRichText(topic.note_content)}</div></article>` : ''}</div>`;
@@ -216,6 +270,8 @@ async function init() {
     state.books = books.items || [];
     state.categories = cats.items || [];
     state.topics = topics.items || [];
+    cleanProgress();
+    saveProgress();
     $('#totalBooks').textContent = dash.bookCount || state.books.length;
     $('#modeBadge').textContent = dash.preview ? 'Mode review' : 'Katalog publik';
     $('#categoryFilter').innerHTML = '<option value="">Semua kategori</option>' + state.categories.map(category => `<option>${esc(category.name)}</option>`).join('');
