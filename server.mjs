@@ -143,26 +143,52 @@ async function bookDetail(slug) {
 }
 
 async function listTopics(url) {
-  const q = (url.searchParams.get("q") || "").trim().toLowerCase();
+  const q = (url.searchParams.get("q") || "").trim();
   const limit = Math.min(100, Math.max(8, Number(url.searchParams.get("limit") || 40)));
+  const pattern = `%${q}%`;
   const rows = await sql`
-    select t.id, t.title, t.categories, t.points, t.created_at, coalesce(n.content, '') as note_content
+    select
+      t.id,
+      t.title,
+      t.categories,
+      t.points,
+      t.created_at,
+      coalesce(string_agg(n.content, E'\n\n' order by n.created_at desc nulls last), '') as note_content
     from public.topics t
     left join public.notes n on n.topic_id = t.id
+    where ${q} = ''
+      or t.title ilike ${pattern}
+      or coalesce(t.categories::text, '') ilike ${pattern}
+      or coalesce(t.points::text, '') ilike ${pattern}
+      or exists (
+        select 1 from public.notes n2
+        where n2.topic_id = t.id and n2.content ilike ${pattern}
+      )
+    group by t.id
     order by t.created_at desc nulls last, t.id desc
     limit ${limit}
   `;
-  const items = rows.map((row) => ({ ...row, categories: normalizeJsonArray(row.categories), points: normalizeJsonArray(row.points) }))
-    .filter((row) => !q || [row.title, ...row.categories, ...row.points, row.note_content].join(" ").toLowerCase().includes(q));
+  const items = rows.map((row) => ({
+    ...row,
+    categories: normalizeJsonArray(row.categories),
+    points: normalizeJsonArray(row.points),
+  }));
   return { items };
 }
 
 async function topicDetail(id) {
   const [row] = await sql`
-    select t.id, t.title, t.categories, t.points, t.created_at, coalesce(n.content, '') as note_content
+    select
+      t.id,
+      t.title,
+      t.categories,
+      t.points,
+      t.created_at,
+      coalesce(string_agg(n.content, E'\n\n' order by n.created_at desc nulls last), '') as note_content
     from public.topics t
     left join public.notes n on n.topic_id = t.id
     where t.id = ${id}
+    group by t.id
   `;
   if (!row) return null;
   return { ...row, categories: normalizeJsonArray(row.categories), points: normalizeJsonArray(row.points) };
