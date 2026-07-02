@@ -9,6 +9,8 @@ const staticDirectory = path.join(root, "docs");
 const port = Number(process.env.PORT || 4177);
 const host = process.env.HOST || "0.0.0.0";
 const previewMode = process.env.PREVIEW_CATALOG === "1";
+const MAX_SEARCH_LENGTH = 120;
+const MAX_SLUG_LENGTH = 160;
 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL wajib diisi.");
 
@@ -19,12 +21,61 @@ const sql = postgres(process.env.DATABASE_URL, {
   idle_timeout: 30,
 });
 
+function securityHeaders() {
+  return {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  };
+}
+
 function sendJson(response, status, payload) {
   response.writeHead(status, {
+    ...securityHeaders(),
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
   });
   response.end(JSON.stringify(payload));
+}
+
+function sendText(response, status, payload) {
+  response.writeHead(status, {
+    ...securityHeaders(),
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  response.end(payload);
+}
+
+function textParam(url, name, maxLength = MAX_SEARCH_LENGTH) {
+  const value = (url.searchParams.get(name) || "").trim();
+  if (value.length > maxLength) {
+    const error = new Error(`${name} terlalu panjang.`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return value;
+}
+
+function limitParam(url, fallback, min, max) {
+  const raw = url.searchParams.get("limit");
+  if (raw === null || raw === "") return fallback;
+  if (!/^\d+$/.test(raw)) {
+    const error = new Error("limit harus berupa angka positif.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return Math.min(max, Math.max(min, Number(raw)));
+}
+
+function safePathSegment(value, label = "slug") {
+  if (!value || value.length > MAX_SLUG_LENGTH || /[\u0000-\u001F\u007F]/.test(value) || value.includes("/")) {
+    const error = new Error(`${label} tidak valid.`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return value;
 }
 
 function normalizeJsonArray(value) {
@@ -45,6 +96,7 @@ function allowedStatuses() {
 
 async function serveStatic(response, pathname) {
   const relative = pathname === "/" ? "index.html" : pathname.slice(1);
+  if (relative.split("/").some((part) => part.startsWith("."))) return false;
   const filePath = path.resolve(staticDirectory, relative);
   if (!filePath.startsWith(path.resolve(staticDirectory))) return false;
   try {
@@ -60,7 +112,7 @@ async function serveStatic(response, pathname) {
       ".jpg": "image/jpeg",
       ".jpeg": "image/jpeg",
     }[extension] || "application/octet-stream";
-    response.writeHead(200, { "Content-Type": contentType, "Cache-Control": "public, max-age=300" });
+    response.writeHead(200, { ...securityHeaders(), "Content-Type": contentType, "Cache-Control": "public, max-age=300" });
     response.end(content);
     return true;
   } catch {
@@ -91,9 +143,9 @@ async function listCategories() {
 }
 
 async function listBooks(url) {
-  const q = (url.searchParams.get("q") || "").trim();
-  const category = (url.searchParams.get("category") || "").trim();
-  const limit = Math.min(60, Math.max(6, Number(url.searchParams.get("limit") || 24)));
+  const q = textParam(url, "q");
+  const category = textParam(url, "category");
+  const limit = limitParam(url, 24, 6, 60);
   const pattern = `%${q}%`;
   const statuses = allowedStatuses();
   const rows = await sql`
@@ -143,8 +195,8 @@ async function bookDetail(slug) {
 }
 
 async function listTopics(url) {
-  const q = (url.searchParams.get("q") || "").trim();
-  const limit = Math.min(100, Math.max(8, Number(url.searchParams.get("limit") || 40)));
+  const q = textParam(url, "q");
+  const limit = limitParam(url, 40, 8, 100);
   const pattern = `%${q}%`;
   const rows = await sql`
     select
@@ -204,18 +256,22 @@ export default async function handler(request, response) {
     if (pathname === "/api/categories") return sendJson(response, 200, await listCategories());
     if (pathname === "/api/books") return sendJson(response, 200, await listBooks(url));
     if (pathname.startsWith("/api/books/")) {
-      const item = await bookDetail(decodeURIComponent(pathname.slice(11)));
+      const slug = safePathSegment(decodeURIComponent(pathname.slice(11)), "slug buku");
+      const item = await bookDetail(slug);
       return sendJson(response, item ? 200 : 404, item || { error: "Book not found" });
     }
     if (pathname === "/api/topics") return sendJson(response, 200, await listTopics(url));
     if (pathname.startsWith("/api/topics/")) {
-      const item = await topicDetail(decodeURIComponent(pathname.slice(12)));
+      const id = safePathSegment(decodeURIComponent(pathname.slice(12)), "id topic");
+      const item = await topicDetail(id);
       return sendJson(response, item ? 200 : 404, item || { error: "Topic not found" });
     }
     if (await serveStatic(response, pathname)) return;
-    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("Not found");
+    sendText(response, 404, "Not found");
   } catch (error) {
+    if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+      return sendJson(response, error.statusCode, { error: error.message });
+    }
     console.error(error);
     sendJson(response, 500, { error: "Internal server error" });
   }
