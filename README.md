@@ -169,4 +169,35 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 6 fokus pada bookmark dan progress local-first: pastikan bookmark stabil, lalu tambahkan progress/lanjut baca hanya jika bisa dilakukan tanpa auth dan tanpa perubahan schema.
 - Commit: `6aa949f7d5972ed084e8c5f1357a302f283399fd`, `f5fe88d4c872620f4c8757317931feeacdb6ec6e`
 
+### Iterasi 6 — Bookmark dan Progress Local-First
+
+- Waktu: 2026-07-02 15:59 WIB
+- Tujuan: Memastikan bookmark tetap stabil dan menambahkan progress baca local-first tanpa auth, tanpa schema baru, dan tanpa mengubah data production.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga live production belum bisa diklaim terverifikasi dari tool.
+  - Inspect `docs/app.js` menunjukkan bookmark sudah memakai `localStorage` key `fareader-v2:bookmarks`, sehingga simpanan bersifat lokal per browser dan tidak membutuhkan auth.
+  - Inspect `docs/app.js` juga menunjukkan belum ada penyimpanan progress baca, belum ada state buku aktif, dan tombol kartu selalu membuka reader dari awal.
+  - Inspect perubahan memastikan progress baru memakai `localStorage` key `fareader-v2:progress`, bukan database, bukan Supabase schema, dan bukan endpoint baru.
+- Perubahan:
+  - Menambahkan state `progress`, `currentBookSlug`, dan `currentSectionsTotal` di frontend.
+  - Menambahkan helper `progressFor()`, `progressText()`, `markProgress()`, `saveProgress()`, dan `cleanProgress()`.
+  - Tombol kartu buku sekarang berubah menjadi `Lanjut membaca` jika buku punya progress lokal.
+  - Metadata kartu menampilkan posisi terakhir, misalnya `Lanjut section 2/5`.
+  - `openBook()` sekarang menerima parameter section awal dan menyimpan section terakhir saat buku dibuka.
+  - Navigasi section sebelumnya/berikutnya dan tombol section nav sekarang memperbarui progress lokal.
+  - Progress lama untuk slug yang sudah tidak ada di katalog akan dibersihkan setelah katalog production berhasil dimuat.
+  - Tidak ada perubahan pada backend, database, status buku, schema Supabase, domain, DNS, atau filter publik `published`.
+- Hasil:
+  - Bookmark tetap local-first dan tidak diubah format penyimpanannya.
+  - Progress baca sekarang tersedia local-first, bisa dipakai untuk lanjut membaca tanpa login.
+  - Perubahan sudah dicommit ke `main`.
+  - Verifikasi visual production masih menunggu akses Vercel yang berhasil atau deploy selesai dari platform.
+- Risiko/temuan:
+  - Progress hanya akurat saat pengguna membuka buku atau memakai tombol navigasi section; belum otomatis mengikuti scroll manual.
+  - Progress tersimpan per browser/per device karena belum ada auth dan sinkronisasi akun.
+  - Jika user membersihkan localStorage browser, bookmark dan progress akan hilang.
+- Langkah berikutnya:
+  - Iterasi 7 fokus ke Lexis Knowledge: uji topics/notes nyata, perbaiki daftar/detail/pencarian dan empty state tanpa mengubah konten sumber.
+- Commit: `21a8d9f3c451dc511cafc079f18fdafd3414d0d9`
+
 <!-- ITERATION_REPORTS_END -->
