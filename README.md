@@ -140,4 +140,33 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 5 fokus ke Reader premium: typography, whitespace, paragraph/bullet rendering, section navigation, dan mobile readability.
 - Commit: `a1d42418c247580470737465c5b375b34eb2df53`, `08fb631d87434284522c8b310b5b79f380174cd3`, `256460747cc543abdeca38fd6ed923afaf42386d`
 
+### Iterasi 5 — Reader Premium UX
+
+- Waktu: 2026-07-02 15:01 WIB
+- Tujuan: Memperbaiki pengalaman baca agar typography, whitespace, paragraph/list rendering, navigasi section, dan mobile readability lebih layak untuk beta production.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga visual live belum bisa diklaim terverifikasi dari tool.
+  - Mencoba membuka `/api/health` dan `/api/books?limit=1`; web tool menolak URL turunan karena hanya mengizinkan URL persis dari pesan pengguna.
+  - Inspect `docs/app.js` sebelum perubahan menunjukkan setiap section reader dirender sebagai satu `<p>` besar dengan `white-space: pre-line`, sehingga bullet, numbered list, dan blockquote tidak mendapat struktur HTML yang layak.
+  - Inspect `docs/styles.css` sebelum perubahan menunjukkan reader sudah punya dasar tipografi, tetapi belum ada styling khusus untuk prose paragraph/list/blockquote, footer section, dan navigasi prev/next.
+- Perubahan:
+  - Menambahkan renderer `renderRichText()` untuk memecah konten section menjadi paragraf, unordered list, ordered list, dan blockquote sederhana.
+  - Reader section sekarang memakai wrapper `.reader-prose`, bukan satu paragraf besar.
+  - Menambahkan tombol `Section sebelumnya` dan `Section berikutnya` di footer tiap section.
+  - Navigasi section sekarang memakai label heading bila tersedia dan menyimpan state aktif saat tombol navigasi dipakai.
+  - Memperbesar ruang baca, memperbaiki line-height, max-width prose, scroll margin, sticky section nav, blockquote styling, dan responsivitas mobile reader.
+  - Perubahan juga diterapkan ke tampilan topic/Knowledge agar poin penting dirender sebagai list.
+  - Tidak ada perubahan pada backend, database, status buku, schema Supabase, domain, DNS, atau filter publik `published`.
+- Hasil:
+  - Reader sekarang lebih nyaman untuk bacaan panjang dan lebih aman untuk konten yang berisi bullet/numbered list.
+  - Perubahan sudah dicommit ke `main`.
+  - Verifikasi runtime live tetap perlu dilakukan setelah Vercel redeploy dan akses browser/API berhasil.
+- Risiko/temuan:
+  - Renderer hanya mendukung format ringan berbasis baris (`-`, `*`, `•`, angka, dan `>`). Markdown kompleks belum didukung.
+  - Active state section nav baru berubah saat tombol nav/prev/next dipakai, belum otomatis mengikuti scroll manual.
+  - Karena live Vercel belum bisa diakses dari tool, belum ada bukti visual production setelah deploy.
+- Langkah berikutnya:
+  - Iterasi 6 fokus pada bookmark dan progress local-first: pastikan bookmark stabil, lalu tambahkan progress/lanjut baca hanya jika bisa dilakukan tanpa auth dan tanpa perubahan schema.
+- Commit: `6aa949f7d5972ed084e8c5f1357a302f283399fd`, `f5fe88d4c872620f4c8757317931feeacdb6ec6e`
+
 <!-- ITERATION_REPORTS_END -->
