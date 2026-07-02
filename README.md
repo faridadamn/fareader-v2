@@ -60,4 +60,31 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 2 harus fokus pada audit Vercel runtime/routing, termasuk apakah `server.mjs` benar-benar berjalan sebagai deployment Vercel atau perlu adaptasi ke route/serverless.
 - Commit: `1f90e26953928d0cb360b7d7defbd4c6843ec729`
 
+### Iterasi 2 — Audit Vercel Runtime dan Routing
+
+- Waktu: 2026-07-02 10:58 WIB
+- Tujuan: Memastikan struktur runtime cocok dengan Vercel dan mencegah blocker deployment karena aplikasi sebelumnya hanya menjalankan Node server biasa.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, jadi status live Vercel belum bisa diklaim hijau dari tool ini.
+  - Mencoba membuka endpoint `/api/health`, `/api/books`, dan `/api/topics`; web tool menolak URL turunan karena hanya mengizinkan URL persis dari pesan pengguna.
+  - Inspect `package.json` menunjukkan hanya ada script `start: node server.mjs`, tanpa konfigurasi build Vercel khusus.
+  - Inspect repo menunjukkan `vercel.json` belum ada sebelum iterasi ini.
+  - Inspect `server.mjs` menunjukkan server selalu menjalankan `createServer(...).listen(...)`, pola yang cocok untuk server Node biasa tetapi rawan tidak jalan sebagai Vercel Serverless Function.
+- Perubahan:
+  - `server.mjs` diubah agar mengekspor `handler(request, response)` sebagai default export untuk runtime Vercel.
+  - Local runtime tetap dipertahankan dengan `createServer(handler).listen(...)` hanya saat `process.env.VERCEL` tidak aktif.
+  - Menambahkan `vercel.json` dengan build `@vercel/node` untuk `server.mjs` dan route catch-all ke `/server.mjs`, sehingga static page dan API tetap ditangani oleh handler yang sama.
+  - Tidak ada perubahan pada filter katalog publik; `published` tetap default production dan `ready_for_review` hanya aktif jika `PREVIEW_CATALOG=1`.
+- Hasil:
+  - Perbaikan runtime/routing sudah dicommit ke `main`.
+  - Struktur sekarang lebih sesuai untuk deployment Vercel dibanding versi sebelumnya yang hanya mengandalkan long-running Node server.
+  - Verifikasi live masih menunggu akses HTTP yang berhasil atau deploy Vercel selesai dari sisi platform.
+- Risiko/temuan:
+  - Jika project Vercel sebelumnya memakai konfigurasi build manual yang bertentangan dengan `vercel.json`, perlu dicek di dashboard Vercel.
+  - Jika `DATABASE_URL` belum dipasang di Vercel, `/api/*` tetap akan gagal meskipun routing sudah benar.
+  - Perlu smoke test ulang setelah Vercel melakukan redeploy dari commit terbaru.
+- Langkah berikutnya:
+  - Iterasi 3 perlu fokus audit katalog `published` setelah endpoint production bisa diakses, atau melakukan audit dari kode/query bila live tool masih terblokir.
+- Commit: `220cddf9822d90ac1c267a691e7ac52704cc50ea`, `7016b82218232a698c81474b270afdb1cf686ba5`
+
 <!-- ITERATION_REPORTS_END -->
