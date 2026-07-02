@@ -87,4 +87,30 @@ Automation menjalankan maksimal 12 iterasi per jam untuk memperbaiki FA Reader V
   - Iterasi 3 perlu fokus audit katalog `published` setelah endpoint production bisa diakses, atau melakukan audit dari kode/query bila live tool masih terblokir.
 - Commit: `220cddf9822d90ac1c267a691e7ac52704cc50ea`, `7016b82218232a698c81474b270afdb1cf686ba5`
 
+### Iterasi 3 — Audit Katalog Published
+
+- Waktu: 2026-07-02 12:00 WIB
+- Tujuan: Mengecek risiko katalog publik, khususnya buku `published` yang metadata atau section-nya belum lengkap, tanpa mengubah isi editorial atau status data.
+- Pengujian:
+  - Mencoba membuka `https://fareader-v2.vercel.app/` melalui web tool; hasil masih gagal dengan `Cache miss`, sehingga data live Supabase/Vercel belum bisa diverifikasi langsung dari tool.
+  - Inspect `server.mjs` mengonfirmasi `/api/books` tetap membatasi katalog dengan `b.status = any(${statuses})`, dan production default masih hanya `published`.
+  - Inspect query `/api/books` mengonfirmasi setiap item sudah membawa `section_count`, `description`, `word_count`, `reading_time_minutes`, `slug`, author, dan kategori.
+  - Inspect frontend menemukan bahwa `section_count = 0` sebelumnya tetap menampilkan tombol `Baca ringkasan`, sehingga buku published kosong bisa terlihat siap dibaca.
+- Perubahan:
+  - Frontend sekarang menandai buku tanpa section sebagai item belum lengkap.
+  - Tombol `Baca ringkasan` dinonaktifkan untuk buku dengan `section_count = 0` dan diganti label `Belum siap dibaca`.
+  - Kartu buku sekarang menampilkan metadata katalog: estimasi menit baca, jumlah kata bila ada, dan jumlah section.
+  - Jika kategori kosong, kartu menampilkan label `Tanpa kategori`, bukan area kosong.
+  - Ringkasan hasil filter menampilkan jumlah buku yang perlu section bila ada.
+  - Tidak ada perubahan pada database, status buku, schema Supabase, atau filter publik `published`.
+- Hasil:
+  - Risiko UX untuk buku published tanpa section sudah dikurangi di sisi katalog.
+  - Audit data faktual dari production masih belum lengkap karena live endpoint belum bisa diakses dari tool.
+- Risiko/temuan:
+  - Bila ada buku `published` tanpa section, sekarang terlihat sebagai masalah katalog, tetapi data sumber tetap perlu diperbaiki secara editorial di Supabase.
+  - Query backend masih menghitung semua row `book_sections`; belum membedakan section yang row-nya ada tetapi `content` kosong. Ini bisa ditangani di iterasi berikutnya jika data live menunjukkan kasus tersebut.
+- Langkah berikutnya:
+  - Iterasi 4 fokus ke pengalaman Perpustakaan: pencarian, filter, empty/loading/error state, dan konsistensi kartu buku.
+- Commit: `9681fd6187a9fca5647e1db6489c031f6aab5fb0`, `76d1e5bfe541dec126d34386b556e14aa27d86bc`
+
 <!-- ITERATION_REPORTS_END -->
