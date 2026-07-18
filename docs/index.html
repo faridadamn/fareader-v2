@@ -5,11 +5,14 @@
 <meta name="theme-color" content="#071B4D"><title>FA Reader V2</title>
 <link rel="stylesheet" href="./styles.css">
 <style>
-.mobile-brand{display:none;text-decoration:none}
+.brand-lockup,.mobile-brand{overflow:hidden;text-decoration:none;background:rgba(255,255,255,.92);box-shadow:0 16px 40px rgba(7,27,77,.16)}
+.brand-lockup{display:inline-flex;width:168px;height:54px;border-radius:16px}
+.mobile-brand{display:none}
+.brand-logo{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
 @media(max-width:860px){
   .topbar{display:grid;grid-template-columns:auto minmax(0,1fr);justify-content:stretch}
-  .mobile-brand{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
-  .mobile-brand .brand-mark{width:42px;height:42px;border-radius:13px;font-size:16px;box-shadow:0 12px 28px rgba(0,153,168,.2)}
+  .mobile-brand{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:14px;flex:0 0 auto}
+  .mobile-brand .brand-logo{width:100%;height:100%;object-fit:cover}
   .search-box{min-width:0;width:100%}
 }
 </style>
@@ -17,7 +20,7 @@
 <body>
 <div class="app-shell">
   <aside class="sidebar">
-    <a class="brand-lockup" href="#library" aria-label="FA Reader"><span class="brand-mark">FA</span><span><strong>FA Reader</strong><small>V2 Preview</small></span></a>
+    <a class="brand-lockup" href="#library" aria-label="FA Reader"><img class="brand-logo" src="https://raw.githubusercontent.com/faridadamn/fareader/main/web/public/assets/fa-reader-logo.png" alt="FA Reader"></a>
     <nav class="side-nav" aria-label="Menu utama">
       <button class="nav-item active" data-view="library"><span>⌂</span><span>Beranda</span></button>
       <button class="nav-item" data-view="bookmarks"><span>▱</span><span>Bookmark</span></button>
@@ -27,7 +30,7 @@
     <section class="sync-card"><strong>Baca lebih fokus.</strong><span>Preview V2 menjaga pengalaman FA Reader V1, lalu menambahkan Lexis Knowledge.</span></section>
   </aside>
   <main class="main-area">
-    <header class="topbar"><a class="mobile-brand" href="#library" aria-label="FA Reader"><span class="brand-mark">FA</span></a><form class="search-box" onsubmit="event.preventDefault();filterBooks()"><span>⌕</span><input id="searchInput" type="search" placeholder="Cari buku, penulis, kategori, atau deskripsi…" oninput="filterBooks()"></form><span id="modeBadge" class="mode-badge">Preview katalog</span></header>
+    <header class="topbar"><a class="mobile-brand" href="#library" aria-label="FA Reader"><img class="brand-logo" src="https://raw.githubusercontent.com/faridadamn/fareader/main/web/public/assets/fa-reader-logo.png" alt="FA Reader"></a><form class="search-box" onsubmit="event.preventDefault();filterBooks()"><span>⌕</span><input id="searchInput" type="search" placeholder="Cari buku, penulis, kategori, atau deskripsi…" oninput="filterBooks()"></form><span id="modeBadge" class="mode-badge">Preview katalog</span></header>
     <section id="libraryView" class="view active-view">
       <section class="hero-card"><div><p class="eyebrow">FA Reader</p><h1>Baca lebih fokus. Simpan wawasan. Tumbuhkan diri setiap hari.</h1><p>Temukan ringkasan buku, lanjutkan bacaan, dan simpan buku penting untuk dibaca lagi.</p></div><div class="hero-stats"><div><span id="totalBooks">4</span><small>Buku tersedia</small></div><div><span id="savedCount">0</span><small>Bookmark</small></div><div><span id="readingCount">0</span><small>Siap dibaca</small></div></div></section>
       <section class="section-heading"><div><h2>Perpustakaan</h2><p id="resultMeta">Memuat katalog production…</p></div><div class="library-controls"><select id="categoryFilter" onchange="filterBooks()"><option value="">Semua kategori</option><option>Pengembangan Diri</option><option>Produktivitas</option><option>Keuangan</option></select><select id="sortFilter" onchange="filterBooks()"><option value="default">Terbaru</option><option value="title-asc">A–Z</option><option value="shortest">Paling singkat</option><option value="longest">Paling panjang</option></select><button class="ghost-button" type="button" onclick="resetLibraryFilters()">Reset</button></div></section>
